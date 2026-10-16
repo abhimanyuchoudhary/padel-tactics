@@ -42,7 +42,7 @@
   function el(h) { app.innerHTML = h; window.scrollTo(0, 0); var f = app.querySelector('h2'); if (f) { f.tabIndex = -1; f.focus({ preventScroll: true }); } }
   function on(sel, fn) { app.querySelectorAll(sel).forEach(function (b) { b.addEventListener('click', fn); }); }
 
-  function home() {
+  function home() { S.note = '';
     var l = load();
     el('<h2>Your opponent pairs</h2><button class="primary" id="new">+ New opponent pair</button>' +
       (l.length ? l.map(function (p) { return '<div class="card"><h3>' + esc(p.name || 'Unnamed') + '</h3><p class="small">A: ' + esc(p.opp[0].level || '?') + ' ' + esc(p.opp[0].side === 'L' ? 'left' : 'right') + ' side · B: ' + esc(p.opp[1].level || '?') + ' ' + esc(p.opp[1].side === 'L' ? 'left' : 'right') + ' side</p><div class="row"><button class="primary" data-a="view" data-id="' + p.id + '">Tactics</button><button class="ghost" data-a="card" data-id="' + p.id + '">Card</button></div><div class="row"><button class="ghost" data-a="edit" data-id="' + p.id + '">Edit</button><button class="danger" data-a="del" data-id="' + p.id + '">Delete</button></div></div>'; }).join('') : '<p class="small">No saved pairs yet. Answer 29 quick questions about your opponents and get a game plan.</p>'));
@@ -64,7 +64,7 @@
     if (q.text) h = '<label for="t" class="small">' + (q.optional ? 'Optional - skip if unsure' : 'Type a name') + '</label><input type="text" id="t" value="' + esc(v || '') + '" placeholder="' + esc(q.placeholder || '') + '">';
     else h = q.opts.map(function (x) { var sel = q.multi ? (v || []).indexOf(x.v) >= 0 : v === x.v; return '<button class="opt" aria-pressed="' + sel + '" data-v="' + esc(x.v) + '">' + esc(x.l) + '</button>'; }).join('') +
       (q.other ? '<input type="text" id="oth" placeholder="Other: describe it" value="' + esc(S.ans[q.other] || '') + '">' : '') +
-      (q.multi ? '<p class="small">' + (q.multi < q.opts.length ? 'Pick up to ' + q.multi + '. ' : 'Pick all that apply. ') + (q.optional ? 'Optional.' : 'Then tap Next.') + '</p>' : '');
+      (S.note ? '<p class="note" role="status">' + esc(S.note) + '</p>' : '') + (q.multi ? '<p class="small">' + (q.multi < q.opts.length ? 'Pick up to ' + q.multi + '. ' : 'Pick all that apply. ') + (q.optional ? 'Optional.' : 'Then tap Next.') + '</p>' : '');
     el('<div class="progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><div style="width:' + pct + '%"></div></div><p class="small">Question ' + (S.step + 1) + ' of ' + QS.length + '</p><h2>' + esc(q.q) + '</h2>' + h +
       '<div class="nav"><button class="ghost" id="back">' + (S.step ? 'Back' : 'Cancel') + '</button><button class="primary" id="next" ' + (valid(q) ? '' : 'disabled') + '>' + (S.step === QS.length - 1 ? 'See tactics' : 'Next') + '</button></div>');
     var next = app.querySelector('#next');
@@ -72,13 +72,13 @@
     var ot = app.querySelector('#oth'); if (ot) ot.addEventListener('input', function () { S.ans[q.other] = ot.value; if (ot.value.trim()) { var c = get(q.path) || []; if (c.indexOf('other') < 0 && c.length < q.multi) { c.push('other'); set(q.path, c); var b = app.querySelector('[data-v=other]'); b.setAttribute('aria-pressed', 'true'); } } next.disabled = !valid(q); });
     on('.opt', function (e) {
       var val = e.currentTarget.dataset.v;
-      if (q.multi) { var c = (get(q.path) || []).slice(), i = c.indexOf(val); if (i >= 0) c.splice(i, 1); else { if (c.length >= q.multi) c.shift(); c.push(val); } set(q.path, c); wizard(); }
+      if (q.multi) { var c = (get(q.path) || []).slice(), i = c.indexOf(val); S.note = ''; if (i >= 0) c.splice(i, 1); else { var r = PadelEngine.resolvePick(q.path[q.path.length - 1], c, val); c = r.value; S.note = r.note; if (c.length > q.multi) { S.note = (S.note ? S.note + ' ' : '') + 'Removed ' + c[0] + ': up to ' + q.multi + ' picks.'; c.shift(); } } set(q.path, c); wizard(); }
       else { set(q.path, q.optional && get(q.path) === val ? undefined : val); if (!q.optional) { go(1); } else wizard(); }
     });
     on('#back', function () { if (S.step) go(-1); else home(); });
     on('#next', function () { if (S.step === QS.length - 1) { save(); results(); } else go(1); });
   }
-  function go(d) { S.step += d; wizard(); }
+  function go(d) { S.note = ''; S.step += d; wizard(); }
   function save() { var id = S.ans.id; S.ans = PadelEngine.normalize(S.ans); S.ans.id = id; var l = load(); if (!S.ans.id) S.ans.id = 'p' + Date.now(); l = l.filter(function (x) { return x.id !== S.ans.id; }); l.unshift(S.ans); store(l); }
   function results() {
     var r = PadelEngine.analyse(S.ans);

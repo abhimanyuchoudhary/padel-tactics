@@ -37,4 +37,31 @@ if (uniq.size !== Object.keys(sigs).length) { fails++; console.log('FAIL selecti
     assert.deepStrictEqual(E.normalize(n), n, 'idempotent');
     const r = E.analyse(legacy); assert(r.tactics.length >= 3 && !/undefined|NaN/.test(JSON.stringify(r)));
     console.log('PASS legacy single-select pair migrates and renders ->', r.tactics.map(t => t.name).join(' | ')); } catch (e) { fails++; console.log('FAIL legacy', e.message); } }
+// conflict resolution
+try {
+  let r = E.resolvePick('glass', ['Attacking drive', 'Safe lob'], 'Struggles');
+  assert.deepStrictEqual(r.value, ['Struggles']); assert.strictEqual(r.note, "Removed Attacking drive and Safe lob: doesn't fit with Struggles.");
+  r = E.resolvePick('glass', ['Struggles'], 'Chiquita'); assert.deepStrictEqual(r.value, ['Chiquita']);
+  r = E.resolvePick('glass', ['Safe lob'], 'Chiquita'); assert.deepStrictEqual(r.value, ['Safe lob', 'Chiquita']); assert.strictEqual(r.note, '');
+  r = E.resolvePick('style', ['Aggressive net'], 'Defensive back'); assert.deepStrictEqual(r.value, ['Defensive back']); assert(/pick Mixed/.test(r.note));
+  r = E.resolvePick('style', ['Aggressive net', 'Defensive back'], 'Mixed'); assert.deepStrictEqual(r.value, ['Mixed']);
+  r = E.resolvePick('ground', ['Flat & hard', 'Slice & backspin'], 'Mix'); assert.deepStrictEqual(r.value, ['Mix']);
+  r = E.resolvePick('ground', ['Mix'], 'Heavy topspin'); assert.deepStrictEqual(r.value, ['Heavy topspin']);
+  r = E.resolvePick('lobs', ['High & deep', 'Low & fast'], 'Rarely'); assert.deepStrictEqual(r.value, ['Rarely']);
+  r = E.resolvePick('overhead', ['Flat smash', 'Bandeja'], 'Lets it bounce'); assert.deepStrictEqual(r.value, ['Bandeja', 'Lets it bounce']);
+  r = E.resolvePick('weak', ['Backhand'], 'Impatient'); assert.deepStrictEqual(r.value, ['Backhand', 'Impatient']);
+  console.log('PASS conflict resolution (10 cases)');
+} catch (e) { fails++; console.log('FAIL conflicts', e.message); }
+// sanitize saved pairs with conflicts: last pick wins
+try {
+  const bad = { name: 'Bad', opp: [{ level: 'C', hand: 'R', side: 'R', style: ['Aggressive net', 'Defensive back'], ground: ['Flat & hard', 'Mix'], overhead: ['Flat smash', 'Vibora', 'Lets it bounce'], glass: ['Struggles', 'Safe lob'], serve: ['Flat', 'Safe'], lobs: ['Rarely', 'High & deep'], weak: ['Backhand'] }, { level: 'C', hand: 'R', side: 'L', style: 'Mixed', ground: 'Mix', overhead: 'Bandeja', glass: 'Struggles', serve: 'Safe', lobs: 'Rarely', weak: [] }], comms: 'Yes', beats: ['smash'], me: { side: 'R', hand: 'R', strength: 'Consistency' } };
+  const n = E.normalize(bad), o = n.opp[0];
+  assert.deepStrictEqual(o.style, ['Defensive back']); assert.deepStrictEqual(o.ground, ['Mix']); assert.deepStrictEqual(o.overhead, ['Vibora', 'Lets it bounce']);
+  assert.deepStrictEqual(o.glass, ['Safe lob']); assert.deepStrictEqual(o.serve, ['Flat', 'Safe']); assert.deepStrictEqual(o.lobs, ['High & deep']);
+  assert.deepStrictEqual(n.opp[1].glass, ['Struggles']);
+  Object.keys(E.CONFLICTS).forEach(f => n.opp.forEach(p => E.CONFLICTS[f].forEach(c => assert(!(p[f].includes(c[0]) && p[f].includes(c[1])), 'conflict left in ' + f))));
+  assert.deepStrictEqual(E.normalize(n), n);
+  const r = E.analyse(bad); assert(r.tactics.length >= 3 && !/undefined|NaN/.test(JSON.stringify(r)));
+  console.log('PASS conflicting saved pair sanitized (last pick wins) and renders');
+} catch (e) { fails++; console.log('FAIL sanitize', e.message); }
 process.exit(fails ? 1 : 0);

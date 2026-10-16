@@ -7,10 +7,32 @@
   function arr(v) { return Array.isArray(v) ? v.filter(function (x) { return x != null && x !== ''; }) : (v == null || v === '' ? [] : [v]); }
   function is(o, f, v) { return arr(o && o[f]).indexOf(v) >= 0; }
   function has(o, w) { return is(o, 'weak', w); }
+  /* Contradictory picks within one multi-select question. [a, b, tip] */
+  var CONFLICTS = {
+    style: [['Mixed', 'Aggressive net'], ['Mixed', 'Defensive back'], ['Aggressive net', 'Defensive back', 'If they do both, pick Mixed.']],
+    ground: [['Mix', 'Flat & hard'], ['Mix', 'Heavy topspin'], ['Mix', 'Slice & backspin']],
+    overhead: [['Lets it bounce', 'Flat smash']],
+    glass: [['Struggles', 'Attacking drive'], ['Struggles', 'Safe lob'], ['Struggles', 'Chiquita']],
+    lobs: [['Rarely', 'High & deep'], ['Rarely', 'Low & fast']]
+  };
+  /* Add `picked` to `current`, removing anything that conflicts with it. */
+  function resolvePick(field, current, picked) {
+    var removed = [], tips = [];
+    var out = arr(current).filter(function (x) {
+      if (x === picked) return false;
+      var c = (CONFLICTS[field] || []).filter(function (p) { return (p[0] === x && p[1] === picked) || (p[1] === x && p[0] === picked); })[0];
+      if (c) { removed.push(x); if (c[2] && tips.indexOf(c[2]) < 0) tips.push(c[2]); return false; }
+      return true;
+    });
+    out.push(picked);
+    var note = removed.length ? 'Removed ' + list(removed) + ': doesn\'t fit with ' + picked + '.' + (tips.length ? ' ' + tips.join(' ') : '') : '';
+    return { value: out, removed: removed, note: note };
+  }
+  function sanitize(field, v) { var r = []; arr(v).forEach(function (x) { r = resolvePick(field, r, x).value; }); return r; }
   /* Migrate legacy single-value answers to arrays. Returns a new object. */
   function normalize(a) {
     a = JSON.parse(JSON.stringify(a || {}));
-    a.opp = [0, 1].map(function (i) { var o = (a.opp || [])[i] || {}; MULTI.forEach(function (f) { o[f] = arr(o[f]); }); return o; });
+    a.opp = [0, 1].map(function (i) { var o = (a.opp || [])[i] || {}; MULTI.forEach(function (f) { o[f] = sanitize(f, o[f]); }); return o; });
     a.me = a.me || {}; a.me.strength = arr(a.me.strength); a.me.partner = arr(a.me.partner);
     a.beats = arr(a.beats); a.beatsOther = a.beatsOther || ''; a.name = a.name || ''; a.comms = a.comms || '';
     return a;
@@ -202,6 +224,6 @@
   }
 
   function analyse(a) { a = normalize(a); return { tactics: computeTactics(a), situations: computeSituations(a) }; }
-  var api = { analyse: analyse, computeTactics: computeTactics, computeSituations: computeSituations, normalize: normalize, sentences: sentences, SIT: SIT };
+  var api = { analyse: analyse, computeTactics: computeTactics, computeSituations: computeSituations, normalize: normalize, resolvePick: resolvePick, sanitize: sanitize, CONFLICTS: CONFLICTS, sentences: sentences, SIT: SIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PadelEngine = api;
 })(this);
