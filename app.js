@@ -8,13 +8,13 @@
       { path: p('level'), q: who + ': level', opts: [o('D+'), o('C-'), o('C'), o('C+')] },
       { path: p('hand'), q: who + ': which hand?', opts: [o('R', 'Right-handed'), o('L', 'Left-handed')] },
       { path: p('side'), q: who + ': which side do they play?', opts: [o('R', 'Right (drive)'), o('L', 'Left (revés)')] },
-      { path: p('style'), q: who + ': playing style', opts: [o('Aggressive net'), o('Defensive back'), o('Mixed')] },
-      { path: p('ground'), q: who + ': groundstrokes', opts: [o('Flat & hard'), o('Heavy topspin'), o('Slice & backspin'), o('Mix')] },
-      { path: p('overhead'), q: who + ': overhead', opts: [o('Flat smash', 'Flat smash for winners (por 3 / por 4)'), o('Bandeja', 'Bandeja with slice'), o('Vibora', 'Víbora with sidespin'), o('Lets it bounce')] },
-      { path: p('glass'), q: who + ': off the back glass', opts: [o('Attacking drive'), o('Safe lob'), o('Chiquita'), o('Struggles')] },
-      { path: p('serve'), q: who + ': serve', opts: [o('Flat'), o('Slice off glass', 'Slice kicking off side glass'), o('Safe')] },
-      { path: p('lobs'), q: who + ': lobs', opts: [o('High & deep'), o('Low & fast'), o('Rarely')] },
-      { path: p('weak'), q: who + ': weaknesses (up to 2)', multi: 2, opts: ['Backhand', 'Lob defence', 'Back glass / wall rebounds', 'Low volleys', 'Bandeja/overhead', 'Slow footwork', 'Impatient', 'Weak serve return'].map(function (x) { return o(x); }) },
+      { path: p('style'), q: who + ': playing style (pick all that apply)', multi: 99, opts: [o('Aggressive net'), o('Defensive back'), o('Mixed')] },
+      { path: p('ground'), q: who + ': groundstrokes (pick all that apply)', multi: 99, opts: [o('Flat & hard'), o('Heavy topspin'), o('Slice & backspin'), o('Mix')] },
+      { path: p('overhead'), q: who + ': overhead (pick all that apply)', multi: 99, opts: [o('Flat smash', 'Flat smash for winners (por 3 / por 4)'), o('Bandeja', 'Bandeja with slice'), o('Vibora', 'Víbora with sidespin'), o('Lets it bounce')] },
+      { path: p('glass'), q: who + ': off the back glass (pick all that apply)', multi: 99, opts: [o('Attacking drive'), o('Safe lob'), o('Chiquita'), o('Struggles')] },
+      { path: p('serve'), q: who + ': serve (pick all that apply)', multi: 99, opts: [o('Flat'), o('Slice off glass', 'Slice kicking off side glass'), o('Safe')] },
+      { path: p('lobs'), q: who + ': lobs (pick all that apply)', multi: 99, opts: [o('High & deep'), o('Low & fast'), o('Rarely')] },
+      { path: p('weak'), q: who + ': weaknesses (up to 3)', multi: 3, opts: ['Backhand', 'Lob defence', 'Back glass / wall rebounds', 'Low volleys', 'Bandeja/overhead', 'Slow footwork', 'Impatient', 'Weak serve return'].map(function (x) { return o(x); }) },
       { path: p('best'), q: who + ': best shot (optional)', text: true, optional: true }
     ];
   }
@@ -24,14 +24,19 @@
       { path: ['beats'], q: 'How do they beat you? (pick 1-2)', multi: 2, opts: Object.keys(PadelEngine.SIT).map(function (k) { return o(k, PadelEngine.SIT[k].label); }).concat([o('other', 'Other (type below)')]), other: 'beatsOther' },
       { path: ['me', 'side'], q: 'You: which side do you play?', opts: [o('R', 'Right (drive)'), o('L', 'Left (revés)')] },
       { path: ['me', 'hand'], q: 'You: which hand?', opts: [o('R', 'Right-handed'), o('L', 'Left-handed')] },
-      { path: ['me', 'strength'], q: 'You: your main strength', opts: STR },
-      { path: ['me', 'partner'], q: 'Your partner\'s strength (optional)', opts: STR, optional: true }
+      { path: ['me', 'strength'], q: 'You: your strengths (pick all that apply)', multi: 99, opts: STR },
+      { path: ['me', 'partner'], q: 'Your partner\'s strengths (optional, pick all that apply)', multi: 99, opts: STR, optional: true }
     ]);
-  function blank() { return { id: null, name: '', opp: [{ weak: [] }, { weak: [] }], comms: '', beats: [], beatsOther: '', me: {} }; }
+  function blank() { return PadelEngine.normalize({ id: null }); }
   var S = { ans: blank(), step: 0 }, app = document.getElementById('app');
   function get(p) { var x = S.ans; for (var i = 0; i < p.length; i++) { if (x == null) return undefined; x = x[p[i]]; } return x; }
   function set(p, v) { var x = S.ans; for (var i = 0; i < p.length - 1; i++) x = x[p[i]] = x[p[i]] || {}; x[p[p.length - 1]] = v; }
-  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
+  function load() {
+    var l; try { l = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { l = []; }
+    if (!Array.isArray(l)) l = [];
+    l = l.filter(function (p) { return p && typeof p === 'object'; }).map(function (p) { var n = PadelEngine.normalize(p); n.id = p.id || ('p' + Math.random().toString(36).slice(2)); return n; });
+    store(l); return l; /* saved back in the new array format */
+  }
   function store(l) { localStorage.setItem(KEY, JSON.stringify(l)); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function el(h) { app.innerHTML = h; window.scrollTo(0, 0); var f = app.querySelector('h2'); if (f) { f.tabIndex = -1; f.focus({ preventScroll: true }); } }
@@ -40,18 +45,18 @@
   function home() {
     var l = load();
     el('<h2>Your opponent pairs</h2><button class="primary" id="new">+ New opponent pair</button>' +
-      (l.length ? l.map(function (p) { return '<div class="card"><h3>' + esc(p.name || 'Unnamed') + '</h3><p class="small">A: ' + esc(p.opp[0].level) + ' ' + esc(p.opp[0].side === 'L' ? 'left' : 'right') + ' side · B: ' + esc(p.opp[1].level) + ' ' + esc(p.opp[1].side === 'L' ? 'left' : 'right') + ' side</p><div class="row"><button class="primary" data-a="view" data-id="' + p.id + '">Tactics</button><button class="ghost" data-a="card" data-id="' + p.id + '">Card</button></div><div class="row"><button class="ghost" data-a="edit" data-id="' + p.id + '">Edit</button><button class="danger" data-a="del" data-id="' + p.id + '">Delete</button></div></div>'; }).join('') : '<p class="small">No saved pairs yet. Answer about 25 quick questions about your opponents and get a game plan.</p>'));
+      (l.length ? l.map(function (p) { return '<div class="card"><h3>' + esc(p.name || 'Unnamed') + '</h3><p class="small">A: ' + esc(p.opp[0].level || '?') + ' ' + esc(p.opp[0].side === 'L' ? 'left' : 'right') + ' side · B: ' + esc(p.opp[1].level || '?') + ' ' + esc(p.opp[1].side === 'L' ? 'left' : 'right') + ' side</p><div class="row"><button class="primary" data-a="view" data-id="' + p.id + '">Tactics</button><button class="ghost" data-a="card" data-id="' + p.id + '">Card</button></div><div class="row"><button class="ghost" data-a="edit" data-id="' + p.id + '">Edit</button><button class="danger" data-a="del" data-id="' + p.id + '">Delete</button></div></div>'; }).join('') : '<p class="small">No saved pairs yet. Answer 29 quick questions about your opponents and get a game plan.</p>'));
     on('#new', function () { S.ans = blank(); S.step = 0; wizard(); });
     on('[data-a]', function (e) {
       var id = e.currentTarget.dataset.id, a = e.currentTarget.dataset.a, p = l.filter(function (x) { return x.id === id; })[0];
       if (a === 'del') { if (confirm('Delete "' + p.name + '"?')) { store(l.filter(function (x) { return x.id !== id; })); home(); } return; }
-      S.ans = JSON.parse(JSON.stringify(p));
+      S.ans = PadelEngine.normalize(p); S.ans.id = p.id;
       if (a === 'edit') { S.step = 0; wizard(); } else if (a === 'card') card(); else results();
     });
   }
   function valid(q) {
     var v = get(q.path); if (q.optional) return true;
-    if (q.multi) return v && v.length > 0 && (v.indexOf('other') < 0 || true);
+    if (q.multi) return Array.isArray(v) && v.length > 0;
     return v != null && String(v).trim() !== '';
   }
   function wizard() {
@@ -59,7 +64,7 @@
     if (q.text) h = '<label for="t" class="small">' + (q.optional ? 'Optional - skip if unsure' : 'Type a name') + '</label><input type="text" id="t" value="' + esc(v || '') + '" placeholder="' + esc(q.placeholder || '') + '">';
     else h = q.opts.map(function (x) { var sel = q.multi ? (v || []).indexOf(x.v) >= 0 : v === x.v; return '<button class="opt" aria-pressed="' + sel + '" data-v="' + esc(x.v) + '">' + esc(x.l) + '</button>'; }).join('') +
       (q.other ? '<input type="text" id="oth" placeholder="Other: describe it" value="' + esc(S.ans[q.other] || '') + '">' : '') +
-      (q.multi ? '<p class="small">Pick up to ' + q.multi + '.</p>' : '');
+      (q.multi ? '<p class="small">' + (q.multi < q.opts.length ? 'Pick up to ' + q.multi + '. ' : 'Pick all that apply. ') + (q.optional ? 'Optional.' : 'Then tap Next.') + '</p>' : '');
     el('<div class="progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><div style="width:' + pct + '%"></div></div><p class="small">Question ' + (S.step + 1) + ' of ' + QS.length + '</p><h2>' + esc(q.q) + '</h2>' + h +
       '<div class="nav"><button class="ghost" id="back">' + (S.step ? 'Back' : 'Cancel') + '</button><button class="primary" id="next" ' + (valid(q) ? '' : 'disabled') + '>' + (S.step === QS.length - 1 ? 'See tactics' : 'Next') + '</button></div>');
     var next = app.querySelector('#next');
@@ -74,7 +79,7 @@
     on('#next', function () { if (S.step === QS.length - 1) { save(); results(); } else go(1); });
   }
   function go(d) { S.step += d; wizard(); }
-  function save() { var l = load(); if (!S.ans.id) S.ans.id = 'p' + Date.now(); l = l.filter(function (x) { return x.id !== S.ans.id; }); l.unshift(S.ans); store(l); }
+  function save() { var id = S.ans.id; S.ans = PadelEngine.normalize(S.ans); S.ans.id = id; var l = load(); if (!S.ans.id) S.ans.id = 'p' + Date.now(); l = l.filter(function (x) { return x.id !== S.ans.id; }); l.unshift(S.ans); store(l); }
   function results() {
     var r = PadelEngine.analyse(S.ans);
     el('<h2>Game plan vs ' + esc(S.ans.name) + '</h2><button class="primary" id="mc">Open match card</button>' +

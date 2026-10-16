@@ -7,7 +7,7 @@ Static, mobile-first padel game-plan tool. Plain HTML/CSS/JS, no build step, no 
 Open http://localhost:8765 (or just open index.html).
 
 ## Use
-1. New opponent pair -> tap through 29 short questions (opponents A and B, teamwork, how they beat you, you and your partner). Single-choice questions advance on tap.
+1. New opponent pair -> tap through 29 short questions (opponents A and B, teamwork, how they beat you, you and your partner). Level, hand, side and communication are single-choice and advance on tap; style, strokes, overhead, back glass, serve, lobs, weaknesses (up to 3) and strengths are multi-select with a Next button. Pairs saved by the earlier single-select version are migrated to arrays on load.
 2. Get 3-4 tactics (what to do / why it works / switch to this when), plus counter, turn-around and drill for each way they beat you.
 3. Open the match card for a one-glance view between games.
 4. Saved pairs: view, card, edit (wizard reopens prefilled), delete.
