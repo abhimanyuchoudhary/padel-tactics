@@ -1,0 +1,95 @@
+(function () {
+  var KEY = 'padelTactics.pairs.v1';
+  var o = function (v, l) { return { v: v, l: l || v }; };
+  var STR = [o('Net & volleys'), o('Lobs & defence'), o('Power smash'), o('Consistency')];
+  function oppQs(i) {
+    var who = i === 0 ? 'Opponent A' : 'Opponent B', p = function (k) { return ['opp', i, k]; };
+    return [
+      { path: p('level'), q: who + ': level', opts: [o('D+'), o('C-'), o('C'), o('C+')] },
+      { path: p('hand'), q: who + ': which hand?', opts: [o('R', 'Right-handed'), o('L', 'Left-handed')] },
+      { path: p('side'), q: who + ': which side do they play?', opts: [o('R', 'Right (drive)'), o('L', 'Left (revés)')] },
+      { path: p('style'), q: who + ': playing style', opts: [o('Aggressive net'), o('Defensive back'), o('Mixed')] },
+      { path: p('ground'), q: who + ': groundstrokes', opts: [o('Flat & hard'), o('Heavy topspin'), o('Slice & backspin'), o('Mix')] },
+      { path: p('overhead'), q: who + ': overhead', opts: [o('Flat smash', 'Flat smash for winners (por 3 / por 4)'), o('Bandeja', 'Bandeja with slice'), o('Vibora', 'Víbora with sidespin'), o('Lets it bounce')] },
+      { path: p('glass'), q: who + ': off the back glass', opts: [o('Attacking drive'), o('Safe lob'), o('Chiquita'), o('Struggles')] },
+      { path: p('serve'), q: who + ': serve', opts: [o('Flat'), o('Slice off glass', 'Slice kicking off side glass'), o('Safe')] },
+      { path: p('lobs'), q: who + ': lobs', opts: [o('High & deep'), o('Low & fast'), o('Rarely')] },
+      { path: p('weak'), q: who + ': weaknesses (up to 2)', multi: 2, opts: ['Backhand', 'Lob defence', 'Back glass / wall rebounds', 'Low volleys', 'Bandeja/overhead', 'Slow footwork', 'Impatient', 'Weak serve return'].map(function (x) { return o(x); }) },
+      { path: p('best'), q: who + ': best shot (optional)', text: true, optional: true }
+    ];
+  }
+  var QS = [{ path: ['name'], q: 'Name this opponent pair', text: true, placeholder: 'e.g. Tuesday JLT pair' }]
+    .concat(oppQs(0), oppQs(1), [
+      { path: ['comms'], q: 'Do they communicate and move together well?', opts: [o('Yes'), o('No')] },
+      { path: ['beats'], q: 'How do they beat you? (pick 1-2)', multi: 2, opts: Object.keys(PadelEngine.SIT).map(function (k) { return o(k, PadelEngine.SIT[k].label); }).concat([o('other', 'Other (type below)')]), other: 'beatsOther' },
+      { path: ['me', 'side'], q: 'You: which side do you play?', opts: [o('R', 'Right (drive)'), o('L', 'Left (revés)')] },
+      { path: ['me', 'hand'], q: 'You: which hand?', opts: [o('R', 'Right-handed'), o('L', 'Left-handed')] },
+      { path: ['me', 'strength'], q: 'You: your main strength', opts: STR },
+      { path: ['me', 'partner'], q: 'Your partner\'s strength (optional)', opts: STR, optional: true }
+    ]);
+  function blank() { return { id: null, name: '', opp: [{ weak: [] }, { weak: [] }], comms: '', beats: [], beatsOther: '', me: {} }; }
+  var S = { ans: blank(), step: 0 }, app = document.getElementById('app');
+  function get(p) { var x = S.ans; for (var i = 0; i < p.length; i++) { if (x == null) return undefined; x = x[p[i]]; } return x; }
+  function set(p, v) { var x = S.ans; for (var i = 0; i < p.length - 1; i++) x = x[p[i]] = x[p[i]] || {}; x[p[p.length - 1]] = v; }
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
+  function store(l) { localStorage.setItem(KEY, JSON.stringify(l)); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function el(h) { app.innerHTML = h; window.scrollTo(0, 0); var f = app.querySelector('h2'); if (f) { f.tabIndex = -1; f.focus({ preventScroll: true }); } }
+  function on(sel, fn) { app.querySelectorAll(sel).forEach(function (b) { b.addEventListener('click', fn); }); }
+
+  function home() {
+    var l = load();
+    el('<h2>Your opponent pairs</h2><button class="primary" id="new">+ New opponent pair</button>' +
+      (l.length ? l.map(function (p) { return '<div class="card"><h3>' + esc(p.name || 'Unnamed') + '</h3><p class="small">A: ' + esc(p.opp[0].level) + ' ' + esc(p.opp[0].side === 'L' ? 'left' : 'right') + ' side · B: ' + esc(p.opp[1].level) + ' ' + esc(p.opp[1].side === 'L' ? 'left' : 'right') + ' side</p><div class="row"><button class="primary" data-a="view" data-id="' + p.id + '">Tactics</button><button class="ghost" data-a="card" data-id="' + p.id + '">Card</button></div><div class="row"><button class="ghost" data-a="edit" data-id="' + p.id + '">Edit</button><button class="danger" data-a="del" data-id="' + p.id + '">Delete</button></div></div>'; }).join('') : '<p class="small">No saved pairs yet. Answer about 25 quick questions about your opponents and get a game plan.</p>'));
+    on('#new', function () { S.ans = blank(); S.step = 0; wizard(); });
+    on('[data-a]', function (e) {
+      var id = e.currentTarget.dataset.id, a = e.currentTarget.dataset.a, p = l.filter(function (x) { return x.id === id; })[0];
+      if (a === 'del') { if (confirm('Delete "' + p.name + '"?')) { store(l.filter(function (x) { return x.id !== id; })); home(); } return; }
+      S.ans = JSON.parse(JSON.stringify(p));
+      if (a === 'edit') { S.step = 0; wizard(); } else if (a === 'card') card(); else results();
+    });
+  }
+  function valid(q) {
+    var v = get(q.path); if (q.optional) return true;
+    if (q.multi) return v && v.length > 0 && (v.indexOf('other') < 0 || true);
+    return v != null && String(v).trim() !== '';
+  }
+  function wizard() {
+    var q = QS[S.step], v = get(q.path), pct = Math.round(S.step / QS.length * 100), h;
+    if (q.text) h = '<label for="t" class="small">' + (q.optional ? 'Optional - skip if unsure' : 'Type a name') + '</label><input type="text" id="t" value="' + esc(v || '') + '" placeholder="' + esc(q.placeholder || '') + '">';
+    else h = q.opts.map(function (x) { var sel = q.multi ? (v || []).indexOf(x.v) >= 0 : v === x.v; return '<button class="opt" aria-pressed="' + sel + '" data-v="' + esc(x.v) + '">' + esc(x.l) + '</button>'; }).join('') +
+      (q.other ? '<input type="text" id="oth" placeholder="Other: describe it" value="' + esc(S.ans[q.other] || '') + '">' : '') +
+      (q.multi ? '<p class="small">Pick up to ' + q.multi + '.</p>' : '');
+    el('<div class="progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><div style="width:' + pct + '%"></div></div><p class="small">Question ' + (S.step + 1) + ' of ' + QS.length + '</p><h2>' + esc(q.q) + '</h2>' + h +
+      '<div class="nav"><button class="ghost" id="back">' + (S.step ? 'Back' : 'Cancel') + '</button><button class="primary" id="next" ' + (valid(q) ? '' : 'disabled') + '>' + (S.step === QS.length - 1 ? 'See tactics' : 'Next') + '</button></div>');
+    var next = app.querySelector('#next');
+    var t = app.querySelector('#t'); if (t) t.addEventListener('input', function () { set(q.path, t.value); next.disabled = !valid(q); });
+    var ot = app.querySelector('#oth'); if (ot) ot.addEventListener('input', function () { S.ans[q.other] = ot.value; if (ot.value.trim()) { var c = get(q.path) || []; if (c.indexOf('other') < 0 && c.length < q.multi) { c.push('other'); set(q.path, c); var b = app.querySelector('[data-v=other]'); b.setAttribute('aria-pressed', 'true'); } } next.disabled = !valid(q); });
+    on('.opt', function (e) {
+      var val = e.currentTarget.dataset.v;
+      if (q.multi) { var c = (get(q.path) || []).slice(), i = c.indexOf(val); if (i >= 0) c.splice(i, 1); else { if (c.length >= q.multi) c.shift(); c.push(val); } set(q.path, c); wizard(); }
+      else { set(q.path, q.optional && get(q.path) === val ? undefined : val); if (!q.optional) { go(1); } else wizard(); }
+    });
+    on('#back', function () { if (S.step) go(-1); else home(); });
+    on('#next', function () { if (S.step === QS.length - 1) { save(); results(); } else go(1); });
+  }
+  function go(d) { S.step += d; wizard(); }
+  function save() { var l = load(); if (!S.ans.id) S.ans.id = 'p' + Date.now(); l = l.filter(function (x) { return x.id !== S.ans.id; }); l.unshift(S.ans); store(l); }
+  function results() {
+    var r = PadelEngine.analyse(S.ans);
+    el('<h2>Game plan vs ' + esc(S.ans.name) + '</h2><button class="primary" id="mc">Open match card</button>' +
+      '<h3>Tactics</h3>' + r.tactics.map(function (t, i) { return '<div class="card"><h3>' + (i + 1) + '. ' + esc(t.name) + '</h3><p><span class="lbl">What to do: </span>' + esc(t.what) + '</p><p><span class="lbl">Why it works: </span>' + esc(t.why) + '</p><p><span class="lbl">Switch to this when: </span>' + esc(t.when) + '</p></div>'; }).join('') +
+      (r.situations.length ? '<h3>How they beat you - and the fix</h3>' + r.situations.map(function (s) { return '<div class="card"><h3>' + esc(s.label) + '</h3><p><span class="lbl">Why it happens: </span>' + esc(s.why) + '</p><p><span class="lbl">Counter: </span>' + esc(s.counter) + '</p><p><span class="lbl">Turn it around: </span>' + esc(s.turn) + '</p><p><span class="lbl">Drill: </span>' + esc(s.drill) + '</p></div>'; }).join('') : '') +
+      '<div class="row"><button class="ghost" id="ed">Edit answers</button><button class="ghost" id="hm">All pairs</button></div>');
+    on('#mc', card); on('#ed', function () { S.step = 0; wizard(); }); on('#hm', home);
+  }
+  function card() {
+    var r = PadelEngine.analyse(S.ans);
+    el('<h2>Match card</h2><div class="match"><strong>vs ' + esc(S.ans.name) + '</strong><ol>' + r.tactics.map(function (t) { return '<li>' + esc(t.name) + '<span class="s">' + esc(t.short) + ' · switch when: ' + esc(t.when.split(/ - |, or |\. /)[0].replace(/\.$/, '')) + '</span></li>'; }).join('') + '</ol>' +
+      (r.situations.length ? '<p><strong>If they…</strong></p><ol>' + r.situations.map(function (s) { return '<li>' + esc(s.label) + '<span class="s">' + esc(s.counter.split('. ')[0].replace(/\.$/, '')) + '</span></li>'; }).join('') + '</ol>' : '') +
+      '</div><button class="ghost" id="bk">Back to full plan</button>');
+    on('#bk', results);
+  }
+  document.getElementById('home-link').addEventListener('click', home);
+  home();
+})();
