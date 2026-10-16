@@ -15,6 +15,9 @@ Open http://localhost:8765 (or just open index.html).
 ## Files
 - index.html, style.css, app.js - UI and wizard
 - engine.js - rules engine (scores ~11 standard tactics from the answers, picks the top 3-4)
-- test/engine.test.js - `node test/engine.test.js`
+- profile.js - "My profile" (Part 4) helpers, localStorage key padelTactics.profile.v1
+- test/engine.test.js, test/profile.test.js - run with node
 
 Contradictory picks (e.g. "Struggles" plus "Attacking drive" off the back glass) are auto-removed with a short note; saved pairs with conflicts are cleaned on load (last pick wins). Rules: CONFLICTS in engine.js.
+
+My profile: after the first completed run your side, hand and strengths are saved on this device. Later runs skip those 4 questions and show "Using your profile: ..." with an Edit button. Header "My profile" button views/edits/clears it. Saved pairs keep their own copy.

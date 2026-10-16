@@ -13,3 +13,4 @@ input[type=text],textarea{width:100%;font-size:17px;padding:12px;border:2px soli
 .match{background:#0d2a1f;color:#fff;border-radius:16px;padding:16px}.match ol{padding-left:22px;margin:8px 0}.match li{margin:8px 0;font-size:18px}.match .s{color:#9fe3c2;font-size:15px;display:block}
 .row{display:flex;gap:8px}.row button{flex:1}
 .note{background:#fff4d6;border:1px solid #e8c45a;border-radius:10px;padding:8px 12px;font-size:15px}
+.hbtn{margin-left:auto;width:auto;min-height:44px;margin-top:0;margin-bottom:0;padding:8px 12px;font-size:15px;background:transparent;color:#fff;border-color:#9fe3c2;text-align:center}
